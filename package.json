@@ -1,0 +1,20 @@
+{
+  "name": "better-suno",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.12.3",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @better-suno/api --filter @better-suno/web dev",
+    "dev:api": "pnpm --filter @better-suno/api dev",
+    "dev:web": "pnpm --filter @better-suno/web dev",
+    "redis:up": "docker compose -f infra/docker-compose.redis.yml up -d redis",
+    "redis:down": "docker compose -f infra/docker-compose.redis.yml down",
+    "worker:dev": "cd services/worker && celery -A better_suno_worker.celery_app:celery_app worker -Q remix.orchestrator,remix.analysis,remix.lyrics,remix.vocal,remix.mixing,remix.quality,remix.default --loglevel=INFO",
+    "worker:stub": "cd services/worker && python -m better_suno_worker.submit_stub",
+    "typecheck": "pnpm --recursive typecheck",
+    "lint": "pnpm --recursive lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

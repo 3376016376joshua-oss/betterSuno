@@ -1,0 +1,29 @@
+[project]
+name = "better-suno-worker"
+version = "0.1.0"
+description = "Redis and Celery worker foundation for BetterSuno remix jobs."
+requires-python = ">=3.11"
+dependencies = [
+  "celery[redis]>=5.4,<6",
+  "pydantic>=2.8,<3",
+  "pydantic-settings>=2.4,<3",
+  "python-dotenv>=1.0,<2",
+  "redis>=5.0,<6"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9",
+  "ruff>=0.8,<1"
+]
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["better_suno_worker*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
