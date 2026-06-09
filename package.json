@@ -9,6 +9,7 @@
     "dev:web": "pnpm --filter @better-suno/web dev",
     "redis:up": "docker compose -f infra/docker-compose.redis.yml up -d redis",
     "redis:down": "docker compose -f infra/docker-compose.redis.yml down",
+    "test:v1-vocals:e2e": "node scripts/test-v1-vocals-e2e.js",
     "worker:dev": "cd services/worker && celery -A better_suno_worker.celery_app:celery_app worker -Q remix.orchestrator,remix.analysis,remix.lyrics,remix.vocal,remix.mixing,remix.quality,remix.default --loglevel=INFO",
     "worker:stub": "cd services/worker && python -m better_suno_worker.submit_stub",
     "typecheck": "pnpm --recursive typecheck",

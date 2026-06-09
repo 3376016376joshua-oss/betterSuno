@@ -8,8 +8,15 @@ export type RightsConfirmation = {
   allowPlatformProcessing: boolean;
 };
 
+export type SourceAudioFile = {
+  filename: string;
+  mimeType: string;
+  base64: string;
+};
+
 export type RemixJobRequest = {
-  sourceAudioUrl: string;
+  sourceAudioUrl?: string;
+  sourceAudioFile?: SourceAudioFile;
   voiceProfileId?: string;
   prompt: string;
   lyrics?: string;
@@ -53,4 +60,63 @@ export type CreateRemixJobResponse = {
 
 export type GetRemixJobResponse = {
   job: RemixJob;
+};
+
+export type VocalRemixJobStatus = "queued" | "separating" | "converting" | "completed" | "failed";
+
+export type VocalRemixConverterMode = "custom" | "svc" | "rvc";
+
+export type VocalRemixArtifactKind = "vocals" | "instrumental" | "converted-vocals";
+
+export type VocalRemixArtifact = {
+  kind: VocalRemixArtifactKind;
+  url: string;
+  path: string;
+  mimeType: string;
+};
+
+export type VocalRemixJobRequest = {
+  sourceAudioPath?: string;
+  sourceAudioFile?: SourceAudioFile;
+  voiceProfileId?: string;
+  converterMode?: VocalRemixConverterMode;
+  voiceModelPath?: string;
+  voiceIndexPath?: string;
+  outputDir?: string;
+  convertedVocalsPath?: string;
+  converterCommandJson?: string;
+  converterBin?: string;
+  converterArgs?: string[];
+  converterCwd?: string;
+  separatorModel?: string;
+  separatorOutputFormat?: string;
+  separatorChunkDuration?: number;
+  separatorImage?: string;
+  rights: RightsConfirmation;
+};
+
+export type VocalRemixConverterRun = {
+  command: string;
+  args: string[];
+};
+
+export type VocalRemixJob = {
+  id: string;
+  status: VocalRemixJobStatus;
+  request: VocalRemixJobRequest;
+  artifacts: VocalRemixArtifact[];
+  inputAudioPath?: string;
+  outputDir?: string;
+  converter?: VocalRemixConverterRun;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateVocalRemixJobResponse = {
+  job: VocalRemixJob;
+};
+
+export type GetVocalRemixJobResponse = {
+  job: VocalRemixJob;
 };

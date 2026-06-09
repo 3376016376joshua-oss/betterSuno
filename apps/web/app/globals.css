@@ -166,6 +166,14 @@ label {
   font-weight: 700;
 }
 
+label small {
+  overflow: hidden;
+  color: var(--muted);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 input,
 select,
 textarea {
@@ -311,6 +319,20 @@ textarea:focus {
   gap: 10px;
 }
 
+.command-box {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.command-box code {
+  overflow: auto;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .section-title {
   color: var(--muted);
   font-weight: 800;
@@ -340,6 +362,18 @@ textarea:focus {
   color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.artifact-row a {
+  overflow: hidden;
+  color: var(--blue);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-row a:hover {
+  text-decoration: underline;
 }
 
 .empty-state {

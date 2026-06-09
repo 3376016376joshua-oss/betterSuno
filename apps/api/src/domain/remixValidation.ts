@@ -1,7 +1,14 @@
 import { z } from "zod";
 
+const sourceAudioFileSchema = z.object({
+  filename: z.string().min(1),
+  mimeType: z.string().min(1),
+  base64: z.string().min(1)
+});
+
 export const remixJobRequestSchema = z.object({
-  sourceAudioUrl: z.string().url(),
+  sourceAudioUrl: z.string().url().optional(),
+  sourceAudioFile: sourceAudioFileSchema.optional(),
   voiceProfileId: z.string().min(1).optional(),
   prompt: z.string().min(1).max(2000),
   lyrics: z.string().max(5000).optional(),
@@ -14,4 +21,7 @@ export const remixJobRequestSchema = z.object({
     hasVoiceConsent: z.boolean(),
     allowPlatformProcessing: z.boolean()
   })
+}).refine((value) => Boolean(value.sourceAudioUrl || value.sourceAudioFile), {
+  message: "Either sourceAudioUrl or sourceAudioFile is required.",
+  path: ["sourceAudioUrl"]
 });

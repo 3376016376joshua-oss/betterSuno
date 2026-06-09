@@ -1,14 +1,34 @@
 "use client";
 
-import { Mic2, Music2, Play, RefreshCw, ShieldCheck, SlidersHorizontal, WandSparkles } from "lucide-react";
+import {
+  FileAudio2,
+  Mic2,
+  Music2,
+  Play,
+  RefreshCw,
+  SlidersHorizontal,
+  TerminalSquare,
+  WandSparkles
+} from "lucide-react";
 import { useMemo, useState } from "react";
-import type { RemixJob, RemixJobRequest } from "@better-suno/shared";
+import type {
+  RemixArtifact,
+  RemixJob,
+  RemixJobRequest,
+  SourceAudioFile,
+  VocalRemixArtifact,
+  VocalRemixJob,
+  VocalRemixJobRequest
+} from "@better-suno/shared";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 const providerLabel = process.env.NEXT_PUBLIC_MUSIC_PROVIDER ?? "Mureka";
 
+type StudioView = "remix" | "vocal-remix";
+type DisplayArtifact = RemixArtifact | VocalRemixArtifact;
+
 const defaultRequest: RemixJobRequest = {
-  sourceAudioUrl: "https://example.com/authorized-song.mp3",
+  sourceAudioUrl: "",
   voiceProfileId: "demo-user-voice",
   prompt: "Create a hopeful hook with a strong melodic memory and fresh lyrics.",
   targetLanguage: "en",
@@ -22,13 +42,77 @@ const defaultRequest: RemixJobRequest = {
   }
 };
 
+const defaultVocalRequest: VocalRemixJobRequest = {
+  sourceAudioPath: "./source.mp3",
+  voiceProfileId: "demo",
+  converterMode: "custom",
+  voiceModelPath: "./storage/voice-profiles/demo/adapter.safetensors",
+  converterCommandJson:
+    '["python","/path/to/svc/infer.py","--input","{input}","--output","{output}","--model","{voiceModel}"]',
+  separatorOutputFormat: "WAV",
+  rights: {
+    hasSourceRights: true,
+    hasVoiceConsent: true,
+    allowPlatformProcessing: true
+  }
+};
+
 export function RemixStudio() {
+  const [activeView, setActiveView] = useState<StudioView>("remix");
+
+  return (
+    <main className="studio-shell">
+      <aside className="studio-sidebar">
+        <div className="brand-lockup">
+          <Music2 aria-hidden="true" />
+          <span>BetterSuno</span>
+        </div>
+
+        <nav className="nav-stack" aria-label="Studio views">
+          <button
+            className={`nav-item ${activeView === "remix" ? "active" : ""}`}
+            type="button"
+            aria-current={activeView === "remix" ? "page" : undefined}
+            onClick={() => setActiveView("remix")}
+          >
+            <WandSparkles aria-hidden="true" />
+            <span>Remix</span>
+          </button>
+          <button
+            className={`nav-item ${activeView === "vocal-remix" ? "active" : ""}`}
+            type="button"
+            aria-current={activeView === "vocal-remix" ? "page" : undefined}
+            onClick={() => setActiveView("vocal-remix")}
+          >
+            <Mic2 aria-hidden="true" />
+            <span>V1 Vocals</span>
+          </button>
+        </nav>
+      </aside>
+
+      <section className="studio-main">
+        {activeView === "remix" ? <RemixWorkspace /> : <VocalRemixWorkspace />}
+      </section>
+    </main>
+  );
+}
+
+function RemixWorkspace() {
   const [request, setRequest] = useState<RemixJobRequest>(defaultRequest);
+  const [lyrics, setLyrics] = useState(
+    "City lights are calling me home\nWe keep the rhythm moving on\nEvery night we find our own\nA little spark before the dawn"
+  );
+  const [sourceAudioFile, setSourceAudioFile] = useState<File | null>(null);
   const [job, setJob] = useState<RemixJob | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasSourceInput = Boolean(sourceAudioFile || request.sourceAudioUrl?.trim());
   const canSubmit =
-    request.rights.hasSourceRights && request.rights.hasVoiceConsent && request.rights.allowPlatformProcessing;
+    request.rights.hasSourceRights &&
+    request.rights.hasVoiceConsent &&
+    request.rights.allowPlatformProcessing &&
+    hasSourceInput &&
+    lyrics.trim().length > 0;
 
   const qualityAverage = useMemo(() => {
     if (!job?.quality) {
@@ -44,17 +128,21 @@ export function RemixStudio() {
     setError(null);
 
     try {
+      const sourceAudioPayload = sourceAudioFile ? await readSourceAudioFile(sourceAudioFile) : undefined;
       const response = await fetch(`${apiBaseUrl}/v1/remix/jobs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify({
+          ...request,
+          sourceAudioUrl: optionalString(request.sourceAudioUrl),
+          lyrics: lyrics.trim(),
+          sourceAudioFile: sourceAudioPayload
+        })
       });
 
-      if (!response.ok) {
-        throw new Error(`API returned ${response.status}`);
-      }
+      await requireOk(response);
 
       const data = (await response.json()) as { job: RemixJob };
       setJob(data.job);
@@ -72,6 +160,8 @@ export function RemixStudio() {
     }
 
     const response = await fetch(`${apiBaseUrl}/v1/remix/jobs/${jobId}`);
+    await requireOk(response);
+
     const data = (await response.json()) as { job: RemixJob };
     setJob(data.job);
 
@@ -81,189 +171,424 @@ export function RemixStudio() {
   };
 
   return (
-    <main className="studio-shell">
-      <aside className="studio-sidebar">
-        <div className="brand-lockup">
-          <Music2 aria-hidden="true" />
-          <span>BetterSuno</span>
+    <>
+      <header className="studio-header">
+        <div>
+          <p className="eyebrow">Authorized remix studio</p>
+          <h1>Build a melody-stable voice remix</h1>
         </div>
+        <button className="icon-button" type="button" onClick={() => refreshJob()} title="Refresh job">
+          <RefreshCw aria-hidden="true" />
+        </button>
+      </header>
 
-        <nav className="nav-stack" aria-label="Studio views">
-          <button className="nav-item active" type="button">
-            <WandSparkles aria-hidden="true" />
-            <span>Remix</span>
-          </button>
-          <button className="nav-item" type="button">
-            <Mic2 aria-hidden="true" />
-            <span>Voices</span>
-          </button>
-          <button className="nav-item" type="button">
-            <ShieldCheck aria-hidden="true" />
-            <span>Rights</span>
-          </button>
-        </nav>
-      </aside>
+      <div className="workspace-grid">
+        <section className="control-panel" aria-label="Remix controls">
+          <label>
+            <span>Source audio file</span>
+            <input
+              type="file"
+              accept="audio/*"
+              onChange={(event) => {
+                setSourceAudioFile(event.target.files?.[0] ?? null);
+              }}
+            />
+            <small>{sourceAudioFile ? sourceAudioFile.name : "Select an authorized audio file to remix."}</small>
+          </label>
 
-      <section className="studio-main">
-        <header className="studio-header">
-          <div>
-            <p className="eyebrow">Authorized remix studio</p>
-            <h1>Build a melody-stable voice remix</h1>
+          <label>
+            <span>Source audio URL</span>
+            <input
+              value={request.sourceAudioUrl}
+              onChange={(event) => setRequest({ ...request, sourceAudioUrl: event.target.value })}
+              placeholder="https://example.com/authorized-song.mp3"
+            />
+          </label>
+
+          <label>
+            <span>Voice profile</span>
+            <input
+              value={request.voiceProfileId ?? ""}
+              onChange={(event) => setRequest({ ...request, voiceProfileId: event.target.value })}
+            />
+          </label>
+
+          <label>
+            <span>Creative prompt</span>
+            <textarea
+              rows={5}
+              value={request.prompt}
+              onChange={(event) => setRequest({ ...request, prompt: event.target.value })}
+            />
+          </label>
+
+          <label>
+            <span>Lyrics</span>
+            <textarea
+              rows={7}
+              value={lyrics}
+              onChange={(event) => setLyrics(event.target.value)}
+              placeholder="Write the lyrics you want the remix to sing."
+            />
+          </label>
+
+          <div className="split-row">
+            <label>
+              <span>Duration</span>
+              <input
+                type="number"
+                min={15}
+                max={90}
+                value={request.durationSeconds}
+                onChange={(event) => setRequest({ ...request, durationSeconds: Number(event.target.value) })}
+              />
+            </label>
+
+            <label>
+              <span>Language</span>
+              <select
+                value={request.targetLanguage}
+                onChange={(event) =>
+                  setRequest({ ...request, targetLanguage: event.target.value as RemixJobRequest["targetLanguage"] })
+                }
+              >
+                <option value="en">English</option>
+                <option value="zh">Chinese</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+                <option value="es">Spanish</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
           </div>
-          <button className="icon-button" type="button" onClick={() => refreshJob()} title="Refresh job">
-            <RefreshCw aria-hidden="true" />
+
+          <label>
+            <span>Melody lock</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={request.keepMelodyStrength}
+              onChange={(event) => setRequest({ ...request, keepMelodyStrength: Number(event.target.value) })}
+            />
+          </label>
+
+          <RightsStrip
+            rights={request.rights}
+            onChange={(rights) => {
+              setRequest({ ...request, rights });
+            }}
+          />
+
+          <button className="primary-action" type="button" onClick={submit} disabled={isSubmitting || !canSubmit}>
+            <Play aria-hidden="true" />
+            <span>{isSubmitting ? "Queued" : "Generate remix"}</span>
           </button>
-        </header>
 
-        <div className="workspace-grid">
-          <section className="control-panel" aria-label="Remix controls">
-            <label>
-              <span>Source audio URL</span>
-              <input
-                value={request.sourceAudioUrl}
-                onChange={(event) => setRequest({ ...request, sourceAudioUrl: event.target.value })}
-              />
-            </label>
+          {error ? <p className="error-text">{error}</p> : null}
+        </section>
 
-            <label>
-              <span>Voice profile</span>
-              <input
-                value={request.voiceProfileId ?? ""}
-                onChange={(event) => setRequest({ ...request, voiceProfileId: event.target.value })}
-              />
-            </label>
+        <section className="result-panel" aria-label="Remix results">
+          <WaveformSurface />
 
-            <label>
-              <span>Creative prompt</span>
-              <textarea
-                rows={5}
-                value={request.prompt}
-                onChange={(event) => setRequest({ ...request, prompt: event.target.value })}
-              />
-            </label>
+          <div className="status-grid">
+            <StatusCell label="Job" value={job?.id.slice(0, 8) ?? "None"} />
+            <StatusCell label="State" value={job?.status ?? "Ready"} />
+            <StatusCell label="Quality" value={qualityAverage !== null ? `${qualityAverage}%` : "Pending"} />
+            <StatusCell label="Provider" value={providerLabel} />
+          </div>
 
-            <div className="split-row">
-              <label>
-                <span>Duration</span>
-                <input
-                  type="number"
-                  min={15}
-                  max={90}
-                  value={request.durationSeconds}
-                  onChange={(event) => setRequest({ ...request, durationSeconds: Number(event.target.value) })}
-                />
-              </label>
+          <ArtifactList artifacts={job?.artifacts ?? []} />
+        </section>
+      </div>
+    </>
+  );
+}
 
-              <label>
-                <span>Language</span>
-                <select
-                  value={request.targetLanguage}
-                  onChange={(event) => setRequest({ ...request, targetLanguage: event.target.value as RemixJobRequest["targetLanguage"] })}
-                >
-                  <option value="en">English</option>
-                  <option value="zh">Chinese</option>
-                  <option value="ja">Japanese</option>
-                  <option value="ko">Korean</option>
-                  <option value="es">Spanish</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </label>
-            </div>
+function VocalRemixWorkspace() {
+  const [request, setRequest] = useState<VocalRemixJobRequest>(defaultVocalRequest);
+  const [sourceAudioFile, setSourceAudioFile] = useState<File | null>(null);
+  const [job, setJob] = useState<VocalRemixJob | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const hasSourceInput = Boolean(sourceAudioFile || request.sourceAudioPath?.trim());
+  const hasConverter = Boolean(
+    request.converterMode === "svc" ||
+      request.converterMode === "rvc" ||
+      request.converterCommandJson?.trim() ||
+      request.converterBin?.trim()
+  );
+  const canSubmit =
+    request.rights.hasSourceRights &&
+    request.rights.hasVoiceConsent &&
+    request.rights.allowPlatformProcessing &&
+    hasSourceInput &&
+    hasConverter;
 
-            <label>
-              <span>Melody lock</span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={request.keepMelodyStrength}
-                onChange={(event) => setRequest({ ...request, keepMelodyStrength: Number(event.target.value) })}
-              />
-            </label>
+  const submit = async () => {
+    setIsSubmitting(true);
+    setError(null);
 
-            <div className="rights-strip">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={request.rights.hasSourceRights}
-                  onChange={(event) =>
-                    setRequest({ ...request, rights: { ...request.rights, hasSourceRights: event.target.checked } })
-                  }
-                />
-                <span>Source cleared</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={request.rights.hasVoiceConsent}
-                  onChange={(event) =>
-                    setRequest({ ...request, rights: { ...request.rights, hasVoiceConsent: event.target.checked } })
-                  }
-                />
-                <span>Voice approved</span>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={request.rights.allowPlatformProcessing}
-                  onChange={(event) =>
-                    setRequest({
-                      ...request,
-                      rights: { ...request.rights, allowPlatformProcessing: event.target.checked }
-                    })
-                  }
-                />
-                <span>Processing approved</span>
-              </label>
-            </div>
+    try {
+      const sourceAudioPayload = sourceAudioFile ? await readSourceAudioFile(sourceAudioFile) : undefined;
+      const response = await fetch(`${apiBaseUrl}/v1/remix/vocals/jobs`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...request,
+          sourceAudioPath: sourceAudioFile ? undefined : optionalString(request.sourceAudioPath),
+          sourceAudioFile: sourceAudioPayload,
+          voiceProfileId: optionalString(request.voiceProfileId),
+          converterMode: request.converterMode,
+          voiceModelPath: optionalString(request.voiceModelPath),
+          outputDir: optionalString(request.outputDir),
+          converterCommandJson: optionalString(request.converterCommandJson),
+          converterCwd: optionalString(request.converterCwd),
+          separatorModel: optionalString(request.separatorModel),
+          separatorOutputFormat: optionalString(request.separatorOutputFormat),
+          separatorImage: optionalString(request.separatorImage)
+        })
+      });
 
-            <button className="primary-action" type="button" onClick={submit} disabled={isSubmitting || !canSubmit}>
-              <Play aria-hidden="true" />
-              <span>{isSubmitting ? "Queued" : "Generate remix"}</span>
-            </button>
+      await requireOk(response);
 
-            {error ? <p className="error-text">{error}</p> : null}
-          </section>
+      const data = (await response.json()) as { job: VocalRemixJob };
+      setJob(data.job);
+      window.setTimeout(() => refreshJob(data.job.id), 500);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Could not create vocal remix job.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-          <section className="result-panel" aria-label="Remix results">
-            <div className="waveform-surface">
-              <div className="wave-line short" />
-              <div className="wave-line tall" />
-              <div className="wave-line mid" />
-              <div className="wave-line peak" />
-              <div className="wave-line mid" />
-              <div className="wave-line tall" />
-              <div className="wave-line short" />
-            </div>
+  const refreshJob = async (jobId = job?.id) => {
+    if (!jobId) {
+      return;
+    }
 
-            <div className="status-grid">
-              <StatusCell label="Job" value={job?.id.slice(0, 8) ?? "None"} />
-              <StatusCell label="State" value={job?.status ?? "Ready"} />
-              <StatusCell label="Quality" value={qualityAverage !== null ? `${qualityAverage}%` : "Pending"} />
-              <StatusCell label="Provider" value={providerLabel} />
-            </div>
+    const response = await fetch(`${apiBaseUrl}/v1/remix/vocals/jobs/${jobId}`);
+    await requireOk(response);
 
-            <div className="artifact-list">
-              <div className="section-title">
-                <SlidersHorizontal aria-hidden="true" />
-                <span>Artifacts</span>
-              </div>
-              {job?.artifacts.length ? (
-                job.artifacts.map((artifact) => (
-                  <div className="artifact-row" key={`${artifact.kind}-${artifact.url}`}>
-                    <span>{artifact.kind}</span>
-                    <code>{artifact.url}</code>
-                  </div>
-                ))
-              ) : (
-                <div className="empty-state">No generated files yet</div>
-              )}
-            </div>
-          </section>
+    const data = (await response.json()) as { job: VocalRemixJob };
+    setJob(data.job);
+
+    if (["queued", "separating", "converting"].includes(data.job.status)) {
+      window.setTimeout(() => refreshJob(jobId), 900);
+    }
+  };
+
+  return (
+    <>
+      <header className="studio-header">
+        <div>
+          <p className="eyebrow">Singing voice conversion</p>
+          <h1>Run the V1 vocal remix pipeline</h1>
         </div>
-      </section>
-    </main>
+        <button className="icon-button" type="button" onClick={() => refreshJob()} title="Refresh job">
+          <RefreshCw aria-hidden="true" />
+        </button>
+      </header>
+
+      <div className="workspace-grid">
+        <section className="control-panel" aria-label="V1 vocal remix controls">
+          <label>
+            <span>Source audio file</span>
+            <input
+              type="file"
+              accept="audio/*"
+              onChange={(event) => {
+                setSourceAudioFile(event.target.files?.[0] ?? null);
+              }}
+            />
+            <small>{sourceAudioFile ? sourceAudioFile.name : "Uses the server-side source path when empty."}</small>
+          </label>
+
+          <label>
+            <span>Source audio path</span>
+            <input
+              value={request.sourceAudioPath ?? ""}
+              onChange={(event) => setRequest({ ...request, sourceAudioPath: event.target.value })}
+              placeholder="./source.mp3"
+            />
+          </label>
+
+          <label>
+            <span>Voice profile</span>
+            <input
+              value={request.voiceProfileId ?? ""}
+              onChange={(event) => setRequest({ ...request, voiceProfileId: event.target.value })}
+              placeholder="demo"
+            />
+          </label>
+
+          <label>
+            <span>Converter mode</span>
+            <select
+              value={request.converterMode ?? "custom"}
+              onChange={(event) =>
+                setRequest({
+                  ...request,
+                  converterMode: event.target.value as VocalRemixJobRequest["converterMode"]
+                })
+              }
+            >
+              <option value="custom">Custom JSON</option>
+              <option value="svc">SVC</option>
+              <option value="rvc">RVC</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Voice model</span>
+            <input
+              value={request.voiceModelPath ?? ""}
+              onChange={(event) => setRequest({ ...request, voiceModelPath: event.target.value })}
+              placeholder="./storage/voice-profiles/demo/adapter.safetensors"
+            />
+          </label>
+
+          <label>
+            <span>Converter command JSON</span>
+            <textarea
+              rows={6}
+              value={request.converterCommandJson ?? ""}
+              onChange={(event) => setRequest({ ...request, converterCommandJson: event.target.value })}
+            />
+          </label>
+
+          <label>
+            <span>Output directory</span>
+            <input
+              value={request.outputDir ?? ""}
+              onChange={(event) => setRequest({ ...request, outputDir: event.target.value })}
+              placeholder="storage/remix-v1-vocals/jobs/custom"
+            />
+          </label>
+
+          <label>
+            <span>Converter cwd</span>
+            <input
+              value={request.converterCwd ?? ""}
+              onChange={(event) => setRequest({ ...request, converterCwd: event.target.value })}
+              placeholder="/path/to/svc"
+            />
+          </label>
+
+          <label>
+            <span>Separator model</span>
+            <input
+              value={request.separatorModel ?? ""}
+              onChange={(event) => setRequest({ ...request, separatorModel: event.target.value })}
+              placeholder="UVR-MDX-NET-Inst_HQ_3.onnx"
+            />
+          </label>
+
+          <label>
+            <span>Separator format</span>
+            <select
+              value={request.separatorOutputFormat ?? "WAV"}
+              onChange={(event) => setRequest({ ...request, separatorOutputFormat: event.target.value })}
+            >
+              <option value="WAV">WAV</option>
+              <option value="MP3">MP3</option>
+              <option value="FLAC">FLAC</option>
+            </select>
+          </label>
+
+          <RightsStrip
+            rights={request.rights}
+            onChange={(rights) => {
+              setRequest({ ...request, rights });
+            }}
+          />
+
+          <button className="primary-action" type="button" onClick={submit} disabled={isSubmitting || !canSubmit}>
+            <FileAudio2 aria-hidden="true" />
+            <span>{isSubmitting ? "Queued" : "Run V1 vocals"}</span>
+          </button>
+
+          {error ? <p className="error-text">{error}</p> : null}
+        </section>
+
+        <section className="result-panel" aria-label="V1 vocal remix results">
+          <WaveformSurface />
+
+          <div className="status-grid">
+            <StatusCell label="Job" value={job?.id.slice(0, 8) ?? "None"} />
+            <StatusCell label="State" value={job?.status ?? "Ready"} />
+            <StatusCell label="Voice" value={job?.request.voiceProfileId ?? request.voiceProfileId ?? "None"} />
+            <StatusCell label="Output" value={job?.outputDir ? "Created" : "Pending"} />
+          </div>
+
+          <ArtifactList artifacts={job?.artifacts ?? []} />
+
+          {job?.converter ? (
+            <div className="command-box">
+              <div className="section-title">
+                <TerminalSquare aria-hidden="true" />
+                <span>Converter</span>
+              </div>
+              <code>{[job.converter.command, ...job.converter.args].join(" ")}</code>
+            </div>
+          ) : null}
+        </section>
+      </div>
+    </>
+  );
+}
+
+function RightsStrip({
+  rights,
+  onChange
+}: {
+  rights: RemixJobRequest["rights"];
+  onChange: (rights: RemixJobRequest["rights"]) => void;
+}) {
+  return (
+    <div className="rights-strip">
+      <label>
+        <input
+          type="checkbox"
+          checked={rights.hasSourceRights}
+          onChange={(event) => onChange({ ...rights, hasSourceRights: event.target.checked })}
+        />
+        <span>Source cleared</span>
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={rights.hasVoiceConsent}
+          onChange={(event) => onChange({ ...rights, hasVoiceConsent: event.target.checked })}
+        />
+        <span>Voice approved</span>
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={rights.allowPlatformProcessing}
+          onChange={(event) => onChange({ ...rights, allowPlatformProcessing: event.target.checked })}
+        />
+        <span>Processing approved</span>
+      </label>
+    </div>
+  );
+}
+
+function WaveformSurface() {
+  return (
+    <div className="waveform-surface">
+      <div className="wave-line short" />
+      <div className="wave-line tall" />
+      <div className="wave-line mid" />
+      <div className="wave-line peak" />
+      <div className="wave-line mid" />
+      <div className="wave-line tall" />
+      <div className="wave-line short" />
+    </div>
   );
 }
 
@@ -274,4 +599,85 @@ function StatusCell({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function ArtifactList({ artifacts }: { artifacts: DisplayArtifact[] }) {
+  return (
+    <div className="artifact-list">
+      <div className="section-title">
+        <SlidersHorizontal aria-hidden="true" />
+        <span>Artifacts</span>
+      </div>
+      {artifacts.length ? (
+        artifacts.map((artifact) => {
+          const href = artifactHref(artifact.url);
+
+          return (
+            <div className="artifact-row" key={`${artifact.kind}-${artifact.url}`}>
+              <span>{artifact.kind}</span>
+              {href ? (
+                <a href={href} target="_blank" rel="noreferrer">
+                  {("path" in artifact && artifact.path) || artifact.url}
+                </a>
+              ) : (
+                <code>{artifact.url}</code>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <div className="empty-state">No generated files yet</div>
+      )}
+    </div>
+  );
+}
+
+async function readSourceAudioFile(file: File): Promise<SourceAudioFile> {
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      resolve(result.split(",")[1] ?? "");
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read audio file."));
+    reader.readAsDataURL(file);
+  });
+
+  return {
+    filename: file.name,
+    mimeType: file.type || "audio/mpeg",
+    base64
+  };
+}
+
+function optionalString(value?: string) {
+  return value?.trim() || undefined;
+}
+
+function artifactHref(url: string) {
+  if (url.startsWith("/")) {
+    return `${apiBaseUrl}${url}`;
+  }
+
+  return url.startsWith("http://") || url.startsWith("https://") ? url : null;
+}
+
+async function requireOk(response: Response) {
+  if (response.ok) {
+    return;
+  }
+
+  let message = `API returned ${response.status}`;
+
+  try {
+    const body = (await response.json()) as { message?: unknown };
+    if (typeof body.message === "string") {
+      message = body.message;
+    }
+  } catch {
+    // Keep the status fallback when the API response is not JSON.
+  }
+
+  throw new Error(message);
 }

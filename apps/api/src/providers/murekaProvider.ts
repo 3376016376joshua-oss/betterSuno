@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import type { RemixArtifact, RemixJobRequest, RemixQualityReport } from "@better-suno/shared";
 import type { GeneratedLyrics, MusicProvider, SourceAnalysis } from "./types";
 
@@ -171,12 +172,13 @@ export const createMurekaProvider = ({
 
   const requestJson = async (path: string, init: RequestInit = {}): Promise<unknown> => {
     assertConfigured();
+    const isFormData = init.body instanceof FormData;
 
     const response = await fetch(`${normalizedBaseUrl}${path}`, {
       ...init,
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...init.headers
       }
     });
@@ -217,13 +219,51 @@ export const createMurekaProvider = ({
     name: "mureka",
 
     async analyzeSource(input) {
-      const uploaded = await requestJson("/v1/files/upload", {
-        method: "POST",
-        body: JSON.stringify({
-          url: input.sourceAudioUrl,
-          purpose: "remix"
-        })
-      });
+      const uploadSource = (purpose?: "remix" | "audio") => {
+        const formData = new FormData();
+
+        if (input.sourceAudioFile) {
+          const bytes = Buffer.from(input.sourceAudioFile.base64, "base64");
+          const blob = new Blob([bytes], { type: input.sourceAudioFile.mimeType });
+          formData.set("file", blob, input.sourceAudioFile.filename);
+        } else if (input.sourceAudioUrl) {
+          formData.set("url", input.sourceAudioUrl);
+        } else {
+          throw new Error("Mureka remix requires a source audio file or source audio URL.");
+        }
+
+        if (purpose) {
+          formData.set("purpose", purpose);
+        }
+
+        return requestJson("/v1/files/upload", {
+          method: "POST",
+          body: formData
+        });
+      };
+      let uploadPurpose: "remix" | "audio" | "unspecified" = "remix";
+      let uploaded: unknown;
+
+      try {
+        uploaded = await uploadSource(uploadPurpose);
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes("purpose")) {
+          throw error;
+        }
+
+        uploadPurpose = "audio";
+        try {
+          uploaded = await uploadSource(uploadPurpose);
+        } catch (fallbackError) {
+          if (!(fallbackError instanceof Error) || !fallbackError.message.includes("purpose")) {
+            throw fallbackError;
+          }
+
+          uploadPurpose = "unspecified";
+          uploaded = await uploadSource();
+        }
+      }
+
       const uploadAudioId = extractUploadAudioId(uploaded);
 
       if (!uploadAudioId) {
@@ -234,7 +274,8 @@ export const createMurekaProvider = ({
         sections: [],
         melodyGuideUrl: `mureka://uploads/${uploadAudioId}`,
         providerData: {
-          uploadAudioId
+          uploadAudioId,
+          uploadPurpose
         }
       };
     },
