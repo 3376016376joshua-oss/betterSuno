@@ -259,7 +259,7 @@ function buildRequest(args, sourcePath) {
     voiceIndexPath: args.voiceIndexPath ? resolveProjectPath(args.voiceIndexPath) : undefined,
     outputDir: args.outputDir ? resolveProjectPath(args.outputDir) : undefined,
     convertedVocalsPath: args.convertedVocalsPath ? resolveProjectPath(args.convertedVocalsPath) : undefined,
-    converterCommandJson: args.mockConverter ? mockConverterCommandJson() : args.converterCommandJson,
+    converterCommandJson: args.mockConverter ? mockConverterCommandJson() : args.converterCommandJson || undefined,
     converterCwd: args.converterCwd ? resolveProjectPath(args.converterCwd) : undefined,
     separatorModel: args.separatorModel || undefined,
     separatorOutputFormat: args.separatorOutputFormat || undefined,
@@ -364,8 +364,12 @@ async function main() {
     ensureFile(args.voiceIndexPath, 'Voice index');
   }
   validateConverterMode(args.converterMode);
-  if ((args.converterMode !== 'svc' && args.converterMode !== 'rvc') || args.mockConverter) {
+  if (args.mockConverter) {
     validateCommandJson(args.mockConverter ? mockConverterCommandJson() : args.converterCommandJson);
+  } else if (args.converterCommandJson) {
+    validateCommandJson(args.converterCommandJson);
+  } else if (!args.voiceProfileId && args.converterMode !== 'svc' && args.converterMode !== 'rvc') {
+    throw new Error('Missing converter command. Pass --converter-command-json, --voice-profile, or an SVC/RVC converter mode.');
   }
 
   let apiProcess = null;

@@ -1,0 +1,37 @@
+#!/usr/bin/env sh
+set -eu
+
+if [ "${SKIP_GITPLAN_HOOK:-}" = "1" ]; then
+  exit 0
+fi
+
+branch="$(git branch --show-current)"
+if [ -z "$branch" ]; then
+  exit 0
+fi
+
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null || true)"
+if [ -z "$upstream" ]; then
+  exit 0
+fi
+
+if ! git rev-list --quiet "$upstream..HEAD"; then
+  exit 0
+fi
+
+changed_plan="$(git diff --name-only "$upstream...HEAD" -- 'gitplans/*.md' || true)"
+if [ -n "$changed_plan" ]; then
+  exit 0
+fi
+
+cat >&2 <<'EOF'
+No gitplans/*.md change was found in the commits being pushed.
+
+Create a high-level sync plan before pushing, for example:
+  pnpm git:sync-plan -- --title "Vocal guide module" --item "pyin extracts melody / F0" --commit --push
+
+To bypass once:
+  SKIP_GITPLAN_HOOK=1 git push
+EOF
+
+exit 1

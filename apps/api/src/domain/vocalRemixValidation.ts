@@ -54,7 +54,7 @@ export const vocalRemixJobRequestSchema = z
     message: "Either sourceAudioPath or sourceAudioFile is required.",
     path: ["sourceAudioPath"]
   })
-  .refine((value) => Boolean(value.converterCommandJson || value.converterBin || value.converterMode === "svc" || value.converterMode === "rvc"), {
-    message: "A converter mode, command JSON array, or converter executable is required.",
+  .refine((value) => Boolean(value.converterCommandJson || value.converterBin || value.voiceProfileId || value.converterMode === "svc" || value.converterMode === "rvc"), {
+    message: "A voice profile, converter mode, command JSON array, or converter executable is required.",
     path: ["converterCommandJson"]
   });
