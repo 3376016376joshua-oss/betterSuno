@@ -32,6 +32,22 @@ Common options:
   --voice-index <path>                  Optional feature index path
   --out-dir <dir>                       Output directory
   --converted-output <path>             Converted vocal output path
+  --guide-lyrics <text>                 Replacement lyrics to align into vocal guide slots
+  --guide-lyrics-file <path>            UTF-8 replacement lyrics file
+  --vocal-guide-output <path>           Guide JSON path
+  --melody-midi-output <path>           Melody MIDI path
+  --alignment-json-output <path>        Alignment JSON path
+  --alignment-textgrid-output <path>    TextGrid path
+  --syllable-map-output <path>          Syllable map path
+  --vocal-guide-language <lang>         Lyric language hint. Defaults to auto
+  --vocal-guide-max-mismatch-ratio <n>  Accepted syllable/slot mismatch ratio
+  --require-vocal-guide-match           Fail job when guide syllable fit is not acceptable
+  --generate-vocal-guide                Generate melody/rhythm guide even without lyrics
+  --extract-rhythm                      Generate rhythm.json with beat grid, phrases, and vocal onsets
+  --rhythm-output <path>                Rhythm JSON path
+  --rhythm-beat-source <source>         vocals, instrumental, mix, or auto. Defaults to vocals
+  --rhythm-sample-rate <hz>             Analysis sample rate. Defaults to worker default
+  --rhythm-hop-length <samples>         Analysis hop length. Defaults to worker default
   --converter-cwd <dir>                 Working directory for converter command
   --separator-model <filename>          audio-separator model filename
   --separator-format <format>           Separator output format. Defaults to API/script default
@@ -65,6 +81,22 @@ function parseArgs(argv) {
     voiceIndexPath: null,
     outputDir: null,
     convertedVocalsPath: null,
+    guideLyrics: null,
+    guideLyricsPath: null,
+    vocalGuidePath: null,
+    melodyMidiPath: null,
+    alignmentJsonPath: null,
+    alignmentTextGridPath: null,
+    syllableMapPath: null,
+    vocalGuideLanguage: null,
+    vocalGuideMaxMismatchRatio: null,
+    requireVocalGuideMatch: false,
+    generateVocalGuide: false,
+    extractRhythm: false,
+    rhythmPath: null,
+    rhythmBeatSource: null,
+    rhythmSampleRate: null,
+    rhythmHopLength: null,
     converterCommandJson: defaultConverterCommandJson,
     converterCwd: null,
     separatorModel: null,
@@ -111,6 +143,38 @@ function parseArgs(argv) {
       args.outputDir = next();
     } else if (arg === '--converted-output') {
       args.convertedVocalsPath = next();
+    } else if (arg === '--guide-lyrics') {
+      args.guideLyrics = next();
+    } else if (arg === '--guide-lyrics-file') {
+      args.guideLyricsPath = next();
+    } else if (arg === '--vocal-guide-output') {
+      args.vocalGuidePath = next();
+    } else if (arg === '--melody-midi-output') {
+      args.melodyMidiPath = next();
+    } else if (arg === '--alignment-json-output') {
+      args.alignmentJsonPath = next();
+    } else if (arg === '--alignment-textgrid-output') {
+      args.alignmentTextGridPath = next();
+    } else if (arg === '--syllable-map-output') {
+      args.syllableMapPath = next();
+    } else if (arg === '--vocal-guide-language') {
+      args.vocalGuideLanguage = next();
+    } else if (arg === '--vocal-guide-max-mismatch-ratio') {
+      args.vocalGuideMaxMismatchRatio = Number(next());
+    } else if (arg === '--require-vocal-guide-match') {
+      args.requireVocalGuideMatch = true;
+    } else if (arg === '--generate-vocal-guide') {
+      args.generateVocalGuide = true;
+    } else if (arg === '--extract-rhythm') {
+      args.extractRhythm = true;
+    } else if (arg === '--rhythm-output') {
+      args.rhythmPath = next();
+    } else if (arg === '--rhythm-beat-source') {
+      args.rhythmBeatSource = next();
+    } else if (arg === '--rhythm-sample-rate') {
+      args.rhythmSampleRate = Number(next());
+    } else if (arg === '--rhythm-hop-length') {
+      args.rhythmHopLength = Number(next());
     } else if (arg === '--converter-command-json') {
       args.converterCommandJson = next();
     } else if (arg === '--converter-cwd') {
@@ -259,6 +323,22 @@ function buildRequest(args, sourcePath) {
     voiceIndexPath: args.voiceIndexPath ? resolveProjectPath(args.voiceIndexPath) : undefined,
     outputDir: args.outputDir ? resolveProjectPath(args.outputDir) : undefined,
     convertedVocalsPath: args.convertedVocalsPath ? resolveProjectPath(args.convertedVocalsPath) : undefined,
+    guideLyrics: args.guideLyrics || undefined,
+    guideLyricsPath: args.guideLyricsPath ? resolveProjectPath(args.guideLyricsPath) : undefined,
+    vocalGuidePath: args.vocalGuidePath ? resolveProjectPath(args.vocalGuidePath) : undefined,
+    melodyMidiPath: args.melodyMidiPath ? resolveProjectPath(args.melodyMidiPath) : undefined,
+    alignmentJsonPath: args.alignmentJsonPath ? resolveProjectPath(args.alignmentJsonPath) : undefined,
+    alignmentTextGridPath: args.alignmentTextGridPath ? resolveProjectPath(args.alignmentTextGridPath) : undefined,
+    syllableMapPath: args.syllableMapPath ? resolveProjectPath(args.syllableMapPath) : undefined,
+    vocalGuideLanguage: args.vocalGuideLanguage || undefined,
+    vocalGuideMaxMismatchRatio: args.vocalGuideMaxMismatchRatio ?? undefined,
+    requireVocalGuideMatch: args.requireVocalGuideMatch || undefined,
+    generateVocalGuide: args.generateVocalGuide || undefined,
+    extractRhythm: args.extractRhythm || undefined,
+    rhythmPath: args.rhythmPath ? resolveProjectPath(args.rhythmPath) : undefined,
+    rhythmBeatSource: args.rhythmBeatSource || undefined,
+    rhythmSampleRate: args.rhythmSampleRate ?? undefined,
+    rhythmHopLength: args.rhythmHopLength ?? undefined,
     converterCommandJson: args.mockConverter ? mockConverterCommandJson() : args.converterCommandJson || undefined,
     converterCwd: args.converterCwd ? resolveProjectPath(args.converterCwd) : undefined,
     separatorModel: args.separatorModel || undefined,
@@ -354,6 +434,24 @@ async function main() {
 
   if (!Number.isFinite(args.pollMs) || args.pollMs <= 0) {
     throw new Error('--poll-ms must be a positive number.');
+  }
+
+  if (
+    args.vocalGuideMaxMismatchRatio != null &&
+    (!Number.isFinite(args.vocalGuideMaxMismatchRatio) ||
+      args.vocalGuideMaxMismatchRatio < 0 ||
+      args.vocalGuideMaxMismatchRatio > 1)
+  ) {
+    throw new Error('--vocal-guide-max-mismatch-ratio must be between 0 and 1.');
+  }
+  if (args.rhythmSampleRate != null && (!Number.isFinite(args.rhythmSampleRate) || args.rhythmSampleRate <= 0)) {
+    throw new Error('--rhythm-sample-rate must be a positive number.');
+  }
+  if (args.rhythmHopLength != null && (!Number.isFinite(args.rhythmHopLength) || args.rhythmHopLength <= 0)) {
+    throw new Error('--rhythm-hop-length must be a positive number.');
+  }
+  if (args.rhythmBeatSource && !['vocals', 'instrumental', 'mix', 'auto'].includes(args.rhythmBeatSource)) {
+    throw new Error('--rhythm-beat-source must be vocals, instrumental, mix, or auto.');
   }
 
   const sourcePath = ensureFile(args.source, 'Source audio');

@@ -62,11 +62,32 @@ export type GetRemixJobResponse = {
   job: RemixJob;
 };
 
-export type VocalRemixJobStatus = "queued" | "separating" | "converting" | "completed" | "failed";
+export type VocalRemixJobStatus =
+  | "queued"
+  | "separating"
+  | "aligning"
+  | "analyzing"
+  | "guiding"
+  | "converting"
+  | "completed"
+  | "failed";
 
 export type VocalRemixConverterMode = "custom" | "svc" | "rvc";
 
-export type VocalRemixArtifactKind = "vocals" | "instrumental" | "converted-vocals";
+export type RhythmBeatSource = "vocals" | "instrumental" | "mix" | "auto";
+
+export type VocalRemixArtifactKind =
+  | "vocals"
+  | "instrumental"
+  | "converted-vocals"
+  | "lyrics-alignment"
+  | "lyrics-alignment-textgrid"
+  | "rhythm"
+  | "vocal-guide"
+  | "melody-midi"
+  | "alignment-json"
+  | "alignment-textgrid"
+  | "syllable-map";
 
 export type VocalRemixArtifact = {
   kind: VocalRemixArtifactKind;
@@ -84,6 +105,43 @@ export type VocalRemixJobRequest = {
   voiceIndexPath?: string;
   outputDir?: string;
   convertedVocalsPath?: string;
+  originalLyrics?: string;
+  originalLyricsPath?: string;
+  generateLyricsAlignment?: boolean;
+  lyricsAlignmentProvider?: "auto" | "mfa" | "whisperx" | "whisperx-mfa";
+  lyricsAlignmentPath?: string;
+  lyricsAlignmentTextGridPath?: string;
+  lyricsAlignmentLanguage?: string;
+  lyricsAlignmentPythonBin?: string;
+  requireLyricsAlignmentPhones?: boolean;
+  mfaBin?: string;
+  mfaDictionary?: string;
+  mfaDictionaryPath?: string;
+  mfaAcousticModel?: string;
+  mfaAcousticModelPath?: string;
+  whisperxBin?: string;
+  whisperxModel?: string;
+  whisperxDevice?: string;
+  whisperxComputeType?: string;
+  whisperxBatchSize?: number;
+  guideLyrics?: string;
+  guideLyricsPath?: string;
+  vocalGuidePath?: string;
+  melodyMidiPath?: string;
+  alignmentJsonPath?: string;
+  alignmentTextGridPath?: string;
+  syllableMapPath?: string;
+  vocalGuideLanguage?: string;
+  vocalGuidePythonBin?: string;
+  vocalGuideMaxMismatchRatio?: number;
+  requireVocalGuideMatch?: boolean;
+  generateVocalGuide?: boolean;
+  extractRhythm?: boolean;
+  rhythmPath?: string;
+  rhythmPythonBin?: string;
+  rhythmBeatSource?: RhythmBeatSource;
+  rhythmSampleRate?: number;
+  rhythmHopLength?: number;
   converterCommandJson?: string;
   converterBin?: string;
   converterArgs?: string[];
@@ -100,6 +158,47 @@ export type VocalRemixConverterRun = {
   args: string[];
 };
 
+export type VocalGuideFit = {
+  status: "no_lyrics" | "match" | "near" | "overfull" | "underfull";
+  isAcceptable: boolean;
+  slotCount: number;
+  lyricSyllableCount: number;
+  difference: number;
+  mismatchRatio: number;
+  maxMismatchRatio: number;
+  warnings: string[];
+};
+
+export type VocalGuideSummary = {
+  path: string;
+  phraseCount: number;
+  slotCount: number;
+  lyricSyllableCount: number;
+  fit: VocalGuideFit;
+};
+
+export type LyricsAlignmentSummary = {
+  path: string;
+  textGridPath?: string;
+  provider?: string | null;
+  transcriptSource?: string | null;
+  wordCount: number;
+  phoneCount: number;
+  hasPhoneTimestamps: boolean;
+  warnings: string[];
+};
+
+export type RhythmSummary = {
+  path: string;
+  tempoBpm?: number | null;
+  beatCount: number;
+  phraseCount: number;
+  vocalOnsetCount: number;
+  syllableCandidateCount: number;
+  beatSource?: string | null;
+  warnings: string[];
+};
+
 export type VocalRemixJob = {
   id: string;
   status: VocalRemixJobStatus;
@@ -108,6 +207,9 @@ export type VocalRemixJob = {
   inputAudioPath?: string;
   outputDir?: string;
   converter?: VocalRemixConverterRun;
+  lyricsAlignment?: LyricsAlignmentSummary;
+  rhythm?: RhythmSummary;
+  vocalGuide?: VocalGuideSummary;
   error?: string;
   createdAt: string;
   updatedAt: string;

@@ -49,6 +49,18 @@ const defaultVocalRequest: VocalRemixJobRequest = {
   voiceModelPath: "./storage/voice-profiles/demo/adapter.safetensors",
   converterCommandJson:
     '["python","/path/to/svc/infer.py","--input","{input}","--output","{output}","--model","{voiceModel}"]',
+  guideLyrics: "",
+  originalLyrics: "",
+  generateLyricsAlignment: false,
+  lyricsAlignmentProvider: "auto",
+  lyricsAlignmentLanguage: "auto",
+  mfaDictionary: "",
+  mfaAcousticModel: "",
+  whisperxDevice: "cpu",
+  whisperxComputeType: "int8",
+  vocalGuideLanguage: "auto",
+  extractRhythm: false,
+  rhythmBeatSource: "vocals",
   separatorOutputFormat: "WAV",
   rights: {
     hasSourceRights: true,
@@ -345,6 +357,37 @@ function VocalRemixWorkspace() {
           converterMode: request.converterMode,
           voiceModelPath: optionalString(request.voiceModelPath),
           outputDir: optionalString(request.outputDir),
+          originalLyrics: optionalString(request.originalLyrics),
+          originalLyricsPath: optionalString(request.originalLyricsPath),
+          generateLyricsAlignment: request.generateLyricsAlignment,
+          lyricsAlignmentProvider: request.lyricsAlignmentProvider,
+          lyricsAlignmentPath: optionalString(request.lyricsAlignmentPath),
+          lyricsAlignmentTextGridPath: optionalString(request.lyricsAlignmentTextGridPath),
+          lyricsAlignmentLanguage: optionalString(request.lyricsAlignmentLanguage),
+          lyricsAlignmentPythonBin: optionalString(request.lyricsAlignmentPythonBin),
+          requireLyricsAlignmentPhones: request.requireLyricsAlignmentPhones,
+          mfaBin: optionalString(request.mfaBin),
+          mfaDictionary: optionalString(request.mfaDictionary),
+          mfaDictionaryPath: optionalString(request.mfaDictionaryPath),
+          mfaAcousticModel: optionalString(request.mfaAcousticModel),
+          mfaAcousticModelPath: optionalString(request.mfaAcousticModelPath),
+          whisperxBin: optionalString(request.whisperxBin),
+          whisperxModel: optionalString(request.whisperxModel),
+          whisperxDevice: optionalString(request.whisperxDevice),
+          whisperxComputeType: optionalString(request.whisperxComputeType),
+          whisperxBatchSize: request.whisperxBatchSize,
+          guideLyrics: optionalString(request.guideLyrics),
+          guideLyricsPath: optionalString(request.guideLyricsPath),
+          vocalGuidePath: optionalString(request.vocalGuidePath),
+          vocalGuideLanguage: optionalString(request.vocalGuideLanguage),
+          vocalGuideMaxMismatchRatio: request.vocalGuideMaxMismatchRatio,
+          requireVocalGuideMatch: request.requireVocalGuideMatch,
+          generateVocalGuide: request.generateVocalGuide,
+          extractRhythm: request.extractRhythm,
+          rhythmPath: optionalString(request.rhythmPath),
+          rhythmBeatSource: request.rhythmBeatSource,
+          rhythmSampleRate: request.rhythmSampleRate,
+          rhythmHopLength: request.rhythmHopLength,
           converterCommandJson: optionalString(request.converterCommandJson),
           converterCwd: optionalString(request.converterCwd),
           separatorModel: optionalString(request.separatorModel),
@@ -376,7 +419,7 @@ function VocalRemixWorkspace() {
     const data = (await response.json()) as { job: VocalRemixJob };
     setJob(data.job);
 
-    if (["queued", "separating", "converting"].includes(data.job.status)) {
+    if (["queued", "separating", "aligning", "analyzing", "guiding", "converting"].includes(data.job.status)) {
       window.setTimeout(() => refreshJob(jobId), 900);
     }
   };
@@ -461,6 +504,125 @@ function VocalRemixWorkspace() {
           </label>
 
           <label>
+            <span>Replacement lyrics</span>
+            <textarea
+              rows={5}
+              value={request.guideLyrics ?? ""}
+              onChange={(event) => setRequest({ ...request, guideLyrics: event.target.value })}
+            />
+          </label>
+
+          <label>
+            <span>Original lyrics</span>
+            <textarea
+              rows={5}
+              value={request.originalLyrics ?? ""}
+              onChange={(event) => setRequest({ ...request, originalLyrics: event.target.value })}
+            />
+          </label>
+
+          <div className="rights-strip">
+            <label>
+              <input
+                type="checkbox"
+                checked={Boolean(request.generateLyricsAlignment)}
+                onChange={(event) => setRequest({ ...request, generateLyricsAlignment: event.target.checked })}
+              />
+              <span>Lyrics alignment</span>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={Boolean(request.extractRhythm)}
+                onChange={(event) => setRequest({ ...request, extractRhythm: event.target.checked })}
+              />
+              <span>Extract rhythm</span>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={Boolean(request.generateVocalGuide)}
+                onChange={(event) => setRequest({ ...request, generateVocalGuide: event.target.checked })}
+              />
+              <span>Vocal guide</span>
+            </label>
+          </div>
+
+          <div className="split-row">
+            <label>
+              <span>Alignment provider</span>
+              <select
+                value={request.lyricsAlignmentProvider ?? "auto"}
+                onChange={(event) =>
+                  setRequest({
+                    ...request,
+                    lyricsAlignmentProvider: event.target.value as VocalRemixJobRequest["lyricsAlignmentProvider"]
+                  })
+                }
+              >
+                <option value="auto">Auto</option>
+                <option value="mfa">MFA</option>
+                <option value="whisperx">WhisperX</option>
+                <option value="whisperx-mfa">WhisperX + MFA</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Alignment language</span>
+              <input
+                value={request.lyricsAlignmentLanguage ?? "auto"}
+                onChange={(event) => setRequest({ ...request, lyricsAlignmentLanguage: event.target.value })}
+                placeholder="auto"
+              />
+            </label>
+          </div>
+
+          <div className="split-row">
+            <label>
+              <span>MFA dictionary</span>
+              <input
+                value={request.mfaDictionary ?? ""}
+                onChange={(event) => setRequest({ ...request, mfaDictionary: event.target.value })}
+                placeholder="english_us_arpa"
+              />
+            </label>
+
+            <label>
+              <span>MFA acoustic</span>
+              <input
+                value={request.mfaAcousticModel ?? ""}
+                onChange={(event) => setRequest({ ...request, mfaAcousticModel: event.target.value })}
+                placeholder="english_us_arpa"
+              />
+            </label>
+          </div>
+
+          <div className="split-row">
+            <label>
+              <span>Guide language</span>
+              <input
+                value={request.vocalGuideLanguage ?? "auto"}
+                onChange={(event) => setRequest({ ...request, vocalGuideLanguage: event.target.value })}
+                placeholder="auto"
+              />
+            </label>
+
+            <label>
+              <span>Guide tolerance</span>
+              <input
+                type="number"
+                min="0"
+                max="1"
+                step="0.05"
+                value={request.vocalGuideMaxMismatchRatio ?? 0.2}
+                onChange={(event) =>
+                  setRequest({ ...request, vocalGuideMaxMismatchRatio: Number(event.target.value) })
+                }
+              />
+            </label>
+          </div>
+
+          <label>
             <span>Output directory</span>
             <input
               value={request.outputDir ?? ""}
@@ -468,6 +630,35 @@ function VocalRemixWorkspace() {
               placeholder="storage/remix-v1-vocals/jobs/custom"
             />
           </label>
+
+          <div className="split-row">
+            <label>
+              <span>Rhythm source</span>
+              <select
+                value={request.rhythmBeatSource ?? "vocals"}
+                onChange={(event) =>
+                  setRequest({
+                    ...request,
+                    rhythmBeatSource: event.target.value as VocalRemixJobRequest["rhythmBeatSource"]
+                  })
+                }
+              >
+                <option value="vocals">Vocals</option>
+                <option value="instrumental">Instrumental</option>
+                <option value="mix">Mix</option>
+                <option value="auto">Auto</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Rhythm output</span>
+              <input
+                value={request.rhythmPath ?? ""}
+                onChange={(event) => setRequest({ ...request, rhythmPath: event.target.value })}
+                placeholder="storage/remix-v1-vocals/jobs/custom/rhythm/rhythm.json"
+              />
+            </label>
+          </div>
 
           <label>
             <span>Converter cwd</span>
@@ -525,6 +716,44 @@ function VocalRemixWorkspace() {
           </div>
 
           <ArtifactList artifacts={job?.artifacts ?? []} />
+
+          {job?.vocalGuide ? (
+            <div className="command-box">
+              <div className="section-title">
+                <SlidersHorizontal aria-hidden="true" />
+                <span>Vocal guide</span>
+              </div>
+              <code>
+                {job.vocalGuide.fit.status} - {job.vocalGuide.lyricSyllableCount}/{job.vocalGuide.slotCount} syllables
+              </code>
+            </div>
+          ) : null}
+
+          {job?.rhythm ? (
+            <div className="command-box">
+              <div className="section-title">
+                <SlidersHorizontal aria-hidden="true" />
+                <span>Rhythm</span>
+              </div>
+              <code>
+                {job.rhythm.tempoBpm ?? "unknown"} BPM - {job.rhythm.beatCount} beats -{" "}
+                {job.rhythm.phraseCount} phrases
+              </code>
+            </div>
+          ) : null}
+
+          {job?.lyricsAlignment ? (
+            <div className="command-box">
+              <div className="section-title">
+                <SlidersHorizontal aria-hidden="true" />
+                <span>Lyrics alignment</span>
+              </div>
+              <code>
+                {job.lyricsAlignment.provider ?? "unknown"} - {job.lyricsAlignment.wordCount} words -{" "}
+                {job.lyricsAlignment.phoneCount} phones
+              </code>
+            </div>
+          ) : null}
 
           {job?.converter ? (
             <div className="command-box">

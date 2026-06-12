@@ -27,7 +27,18 @@ class RemixJobPayload(BaseModel):
 
 
 class RemixArtifact(BaseModel):
-    kind: Literal["master", "vocals", "instrumental", "stems", "waveform", "report"]
+    kind: Literal[
+        "master",
+        "vocals",
+        "instrumental",
+        "stems",
+        "waveform",
+        "report",
+        "rhythm",
+        "vocal-guide",
+        "lyrics-alignment",
+        "lyrics-alignment-textgrid",
+    ]
     uri: str
     mime_type: str
 

@@ -78,6 +78,12 @@ async function runSingingVoiceConversionRemix(inputAudioFile, options = {}) {
       vocalsPath: vocalConversion.vocalsPath,
       instrumentalPath: vocalConversion.instrumentalPath,
       convertedVocalsPath: vocalConversion.convertedVocalsPath,
+      rhythmPath: vocalConversion.rhythmPath || null,
+      vocalGuidePath: vocalConversion.vocalGuidePath || null,
+      melodyMidiPath: vocalConversion.melodyMidiPath || null,
+      alignmentJsonPath: vocalConversion.alignmentJsonPath || null,
+      alignmentTextGridPath: vocalConversion.alignmentTextGridPath || null,
+      syllableMapPath: vocalConversion.syllableMapPath || null,
       masterPath: mix.masterPath,
     },
     separation: {
@@ -88,6 +94,32 @@ async function runSingingVoiceConversionRemix(inputAudioFile, options = {}) {
     conversion: {
       converter: vocalConversion.conversion.converter,
     },
+    rhythm: vocalConversion.rhythm
+      ? {
+          path: vocalConversion.rhythmPath,
+          tempoBpm: vocalConversion.rhythm.summary?.tempoBpm ?? vocalConversion.rhythm.tempoBpm ?? null,
+          beatCount: vocalConversion.rhythm.summary?.beatCount ?? vocalConversion.rhythm.beats?.length ?? 0,
+          phraseCount: vocalConversion.rhythm.summary?.phraseCount ?? vocalConversion.rhythm.phrases?.length ?? 0,
+          vocalOnsetCount:
+            vocalConversion.rhythm.summary?.vocalOnsetCount ?? vocalConversion.rhythm.vocalOnsets?.length ?? 0,
+          syllableCandidateCount: vocalConversion.rhythm.summary?.syllableCandidateCount ?? 0,
+          beatSource: vocalConversion.rhythm.summary?.beatSource ?? null,
+          warnings: vocalConversion.rhythm.summary?.warnings ?? vocalConversion.rhythm.warnings ?? [],
+        }
+      : null,
+    vocalGuide: vocalConversion.vocalGuide
+      ? {
+          path: vocalConversion.vocalGuidePath,
+          melodyMidiPath: vocalConversion.melodyMidiPath || null,
+          alignmentJsonPath: vocalConversion.alignmentJsonPath || null,
+          alignmentTextGridPath: vocalConversion.alignmentTextGridPath || null,
+          syllableMapPath: vocalConversion.syllableMapPath || null,
+          phraseCount: vocalConversion.vocalGuide.rhythm?.phrases?.length ?? 0,
+          slotCount: vocalConversion.vocalGuide.slots?.length ?? 0,
+          lyricSyllableCount: vocalConversion.vocalGuide.lyrics?.syllableCount ?? 0,
+          fit: vocalConversion.vocalGuide.fit,
+        }
+      : null,
     mix,
     quality,
     master,

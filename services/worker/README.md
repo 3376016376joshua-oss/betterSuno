@@ -41,3 +41,17 @@ Submit a stub workflow:
 ```bash
 python -m better_suno_worker.submit_stub
 ```
+
+## Analysis CLIs
+
+Independent analysis stages can also be run without Celery:
+
+```bash
+python -m better_suno_worker.rhythm.cli --help
+python -m better_suno_worker.vocal_guide.cli --help
+python -m better_suno_worker.lyrics_alignment.cli --help
+```
+
+Lyrics alignment shells out to MFA and/or WhisperX when those providers are
+selected; they are intentionally optional external tools rather than baseline
+worker dependencies.
